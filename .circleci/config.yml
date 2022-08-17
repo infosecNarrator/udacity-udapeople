@@ -269,7 +269,7 @@ jobs:
       - add_ssh_keys:
           fingerprints:  ["42:a7:37:6a:65:6b:45:f2:b8:0a:76:63:d5:6e:8a:60"]
       - run:
-          name: Install dependencies
+          name: Install dependencies and deploy backend
           no_output_timeout: 25m
           command: |
             apk add --update ansible curl rsync openssh nodejs npm git
@@ -277,8 +277,6 @@ jobs:
             git --version
             pip install awscli
             aws --version
-      - run:
-          name: Deploy backend
             cd backend
             npm install
             npm run build
