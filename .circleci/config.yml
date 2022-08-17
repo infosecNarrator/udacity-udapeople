@@ -2,17 +2,21 @@ version: 2.1
 
 commands:
   destroy_environment:
-    description: Destroy back-end and front-end cloudformation stacks given a workflow ID
+    description: Destroy Cloud Formation Stacks and infrastructure
     parameters:
       id:
         type: string
     steps:
       - run:
-          name: Destroy Backend, Frontend and Remove S3 bucket.
+          name: Destroy udapeople backend cfn stack
           when: on_fail
           command: |
             aws cloudformation delete-stack --stack-name udapeople-backend-<< parameters.id >>
-            aws s3 rb s3://udapeople-<< parameters.id >> --force
+      - run:
+          name: Destroy udapeople frontend cfn stack and S3 bucket
+          when: on_fail
+          command: |
+            aws s3 rm s3://udapeople-<< parameters.id >> --recursive
             aws cloudformation delete-stack --stack-name udapeople-frontend-<< parameters.id >>
 
   revert_migrations:
@@ -27,8 +31,8 @@ commands:
           name: Revert migrations
           working_directory: ./backend
           command: |
-            status=$(curl --insecure https://kvdb.io/QborQRezDZpvYT4JrLqzEK/migration_${CIRCLE_WORKFLOW_ID:0:7})
-            if(( $status==1));
+            SUCESS=$(curl https://keyvalue.immanuel.co/api/KeyVal/GetValue/hu7t36py^C/DB_MIGRATION_<< parameters.id >>)
+            if [[ "$SUCCESS" == 1 ]]
             then
               npm run migrations:revert
             fi
@@ -68,7 +72,6 @@ jobs:
       - save_cache:
           paths: [backend/node_modules]
           key: backend-build
-
   test-frontend:
     docker:
       - image: circleci/node:13.8.0
@@ -77,7 +80,7 @@ jobs:
       - restore_cache:
           keys: [frontend-test]
       - run:
-          name: Front-end test
+          name: frond-end test
           command: |
              cd frontend
              npm install
@@ -91,12 +94,11 @@ jobs:
       - restore_cache:
           keys: [backend-test]
       - run:
-          name: Back-end test
+          name: backend test
           command: |
              cd backend
              npm install
              npm run test
-
   scan-frontend:
     docker:
       - image: circleci/node:13.8.0
@@ -105,13 +107,12 @@ jobs:
       - restore_cache:
           keys: [front-scan]
       - run:
-          name: Scan Front-end
+          name: front-end scan
           command: |
              cd frontend
              npm install
              npm audit fix --audit-level=critical --force
              npm audit --audit-level=critical
-  
   scan-backend:
     docker:
       - image: circleci/node:13.8.0
@@ -120,11 +121,10 @@ jobs:
       - restore_cache:
           keys: [backend-scan]
       - run:
-          name: Scan Back-end
+          name: backend scan
           command: |
              cd backend
              npm install
-             npm audit fix --audit-level=critical --force
              npm audit fix --force
              npm audit --audit-level=critical
             
@@ -166,7 +166,6 @@ jobs:
           root: .
           paths:
             - ./.circleci/ansible/inventory.txt
-      # rollback code      
       - destroy_environment: 
           id: ${CIRCLE_WORKFLOW_ID:0:7}
           
@@ -204,7 +203,7 @@ jobs:
       - run:
           name: Send migration results to kvdb
           command: |
-            if grep -q "has been done successfully" ~/project/backend/migrations_status.txt
+            if grep -q "has been done successfully" ~/project/backend/migration_status.txt 
             then 
               echo "has been done successfully"
               curl https://kvdb.io/QborQRezDZpvYT4JrLqzEK/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
@@ -213,10 +212,8 @@ jobs:
               echo "has failed"
               curl https://kvdb.io/QborQRezDZpvYT4JrLqzEK/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '0'
             fi
-      # Here's where you will add some code to rollback on failure  
       - destroy_environment:
           id: ${CIRCLE_WORKFLOW_ID:0:7}
-
   deploy-frontend:
     docker:
       - image: circleci/node:13.8.0
@@ -267,20 +264,22 @@ jobs:
     steps:
       - checkout
       - add_ssh_keys:
-          fingerprints:  ["42:a7:37:6a:65:6b:45:f2:b8:0a:76:63:d5:6e:8a:60"]
+          fingerprints: ["42:a7:37:6a:65:6b:45:f2:b8:0a:76:63:d5:6e:8a:60"]
       - run:
           name: Install dependencies and deploy backend
-          no_output_timeout: 25m
+          no_output_timeout: 20m
           command: |
             apk add --update ansible curl rsync openssh nodejs npm git
             ansible --version
             git --version
             pip install awscli
             aws --version
+            echo "list all files and dir"
             cd backend
             npm install
             npm run build
-            cd ..
+            cd -
+            # Zip the directory
             tar -C backend -czvf artifact.tar.gz .
             ls 
             pwd
@@ -289,7 +288,6 @@ jobs:
             --query 'Reservations[*].Instances[*].PublicIpAddress' \
             --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
             --output text >> inventory.txt
-            echo "Contents of the inventory.txt file:"
             cat inventory.txt
             ansible-playbook -i inventory.txt deploy-backend.yml -vvv
       - destroy_environment:
@@ -426,4 +424,5 @@ workflows:
       - cloudfront-update:
           requires: [deploy-backend, deploy-frontend, smoke-test]
       - cleanup:
-          requires: [cloudfront-update]
+          requires:
+            - cloudfront-update
