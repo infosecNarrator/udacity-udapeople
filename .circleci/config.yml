@@ -175,7 +175,7 @@ jobs:
     steps:
       - checkout
       - add_ssh_keys:
-          fingerprints: ["42:a7:37:6a:65:6b:45:f2:b8:0a:76:63:d5:6e:8a:60"]
+          fingerprints: ["9c:05:67:9d:46:8f:b6:f8:76:b8:1f:9a:64:a3:f6:8b"]
       - attach_workspace:
           at: .
       - run:
@@ -264,7 +264,7 @@ jobs:
     steps:
       - checkout
       - add_ssh_keys:
-          fingerprints: ["42:a7:37:6a:65:6b:45:f2:b8:0a:76:63:d5:6e:8a:60"]
+          fingerprints: ["9c:05:67:9d:46:8f:b6:f8:76:b8:1f:9a:64:a3:f6:8b"]
       - run:
           name: Install dependencies and deploy backend
           no_output_timeout: 20m
