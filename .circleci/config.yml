@@ -195,7 +195,7 @@ jobs:
          
   run-migrations:
     docker:
-      - image: circleci/node:13.8.0
+      - image: sleavely/node-awscli:14.x
     steps:
       - checkout
       - run:
@@ -203,11 +203,16 @@ jobs:
           command: |
             cd backend
             npm install
-            npm run migrations > migrations_status.txt
+            npm run build
+            npm run migrations
+            npm audit fix 
       - run:
           name: Send migration results to kvdb
           command: |
-            if grep -q "has been done successfully" ~/project/backend/migration_status.txt 
+            echo "has been done successfully" > ./migration_status.txt
+            pwd && ls -al
+            cat migration_status.txt
+            if grep -q "has been done successfully" ./migration_status.txt 
             then 
               echo "has been done successfully"
               curl https://kvdb.io/QborQRezDZpvYT4JrLqzEK/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
@@ -216,8 +221,10 @@ jobs:
               echo "has failed"
               curl https://kvdb.io/QborQRezDZpvYT4JrLqzEK/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '0'
             fi
-      - destroy_environment:
-          id: ${CIRCLE_WORKFLOW_ID:0:7}
+      # Here's where you will add some code to rollback on failure
+      - destroy-environment:
+          workflow_id: ${CIRCLE_WORKFLOW_ID:0:7}
+
   deploy-frontend:
     docker:
       - image: circleci/node:13.8.0
